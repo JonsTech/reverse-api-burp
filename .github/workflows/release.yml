@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Validate release version
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tags must use vMAJOR.MINOR.PATCH, for example v1.0.0." >&2
+            exit 1
+          fi
+
+          release_version="${GITHUB_REF_NAME#v}"
+          project_version="$(sed -n "s/^version = '\([^']*\)'/\1/p" build.gradle)"
+          if [[ "$release_version" != "$project_version" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match build.gradle version $project_version." >&2
+            exit 1
+          fi
+
+      - name: Build and test release
+        run: ./gradlew clean build
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          release_version="${GITHUB_REF_NAME#v}"
+          jar="build/libs/ReverseAPI-${release_version}.jar"
+          if [[ ! -f "$jar" ]]; then
+            echo "Expected release artifact was not produced: $jar" >&2
+            exit 1
+          fi
+
+          sha256sum "$jar" > "$jar.sha256"
+          echo "RELEASE_JAR=$jar" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "$RELEASE_JAR#Reverse API extension JAR" \
+            "$RELEASE_JAR.sha256#SHA-256 checksum" \
+            --verify-tag \
+            --title "Reverse API $GITHUB_REF_NAME" \
+            --latest \
+            --generate-notes \
+            --notes "Download the attached JAR and load it in Burp Suite through Extensions > Installed > Add > Java. Generated source archives are provided automatically by GitHub."
