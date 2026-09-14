@@ -5,6 +5,8 @@
 
 Reverse API 1.0.0 is a passive Java/Montoya extension for Burp Suite 2026.8. It discovers likely API endpoints in Proxy traffic, supports endpoint review and path normalization, infers observed JSON schemas, and exports OpenAPI 3.1 YAML/JSON or Postman Collection 2.1 JSON.
 
+![Reverse API discovering endpoints in a local OWASP Juice Shop instance](docs/images/reverse-api-juiceshop-demo.png)
+
 ## Download
 
 Download the JAR attached to the latest [GitHub release](https://github.com/JonsTech/reverse-api-burp/releases). Source builds produce the same loadable artifact under `build/libs/`.
