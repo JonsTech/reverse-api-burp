@@ -20,13 +20,12 @@ import java.util.List;
 public final class ReverseApiExtension implements BurpExtension {
     @Override
     public void initialize(MontoyaApi api) {
-        var extensionLoadedAt = java.time.ZonedDateTime.now();
         api.extension().setName("Reverse API");
         CaptureStore store = new CaptureStore();
         TrafficCaptureHandler captureHandler = new TrafficCaptureHandler(store);
         Runnable initializeUi = () -> {
             ReverseApiPanel panel = new ReverseApiPanel(store, captureHandler,
-                    new ProxyHistoryImporter(api.proxy(), captureHandler, extensionLoadedAt), api.userInterface());
+                    new ProxyHistoryImporter(api.proxy(), captureHandler), api.userInterface());
             api.userInterface().applyThemeToComponent(panel);
             api.userInterface().registerSuiteTab("Reverse API", panel);
             api.extension().registerUnloadingHandler(() -> {

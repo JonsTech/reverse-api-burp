@@ -13,6 +13,16 @@ class ApiDetectorTest {
         assertThat(result.api()).isTrue(); assertThat(result.reason()).contains("JSON response");
     }
 
+    @Test void recognizesApiPathsWithEncodedDatesAndJsonArrayResponses() {
+        var result = detector.detect(TestExchange.exchange("GET",
+                "/api/clientdetail/performance/12345/0/2026-01-01%2000:00:00/2026-11-03%2010:40:59/false/null/true",
+                "application/json", "", 200, "application/json",
+                "[{\"openingValue\":0.0,\"iso\":\"GBP\",\"values\":[]}]"));
+        assertThat(result.api()).isTrue();
+        assertThat(result.includedByDefault()).isTrue();
+        assertThat(result.reason()).contains("API-like path", "JSON response", "JSON response body");
+    }
+
     @Test void ignoresStaticAssets() {
         var result = detector.detect(TestExchange.exchange("GET", "/assets/app.js", "", "", 200, "application/javascript", ""));
         assertThat(result.api()).isFalse(); assertThat(result.ignoredStatic()).isTrue();

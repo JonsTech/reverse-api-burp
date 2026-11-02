@@ -4,6 +4,14 @@ All notable changes to Reverse API are documented in this file.
 
 The project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- Import Proxy history now includes requests made after the extension loaded, allowing recovery of traffic missed while capture was paused or scope filtering was enabled.
+- Clarified import status and scope-filter guidance.
+- Capture now defaults to all Proxy hosts, with in-scope-only filtering available as an explicit option.
+
 ## [1.0.0] - 2026-09-12
 
 ### Added
