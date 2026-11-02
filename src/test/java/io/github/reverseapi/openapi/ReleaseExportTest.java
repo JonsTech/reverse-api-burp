@@ -79,7 +79,7 @@ class ReleaseExportTest {
         var op = operation(TestExchange.exchange("POST", "/api", "multipart/form-data", "opaque-private-content", 0, "", ""));
         var root = json.readTree(new OpenApiGenerator().generate(List.of(op)).json());
         assertThat(root.at("/paths/~1api/post/responses/default/description").asText()).isEqualTo("No response observed");
-        assertThat(root.at("/paths/~1api/post/requestBody/content/multipart~1form-data/schema").isEmpty()).isTrue();
+        assertThat(root.at("/paths/~1api/post/requestBody/content/multipart~1form-data/schema/type").asText()).isEqualTo("object");
         assertThat(root.toString()).doesNotContain("opaque-private-content", "\"0\":");
     }
     @Test void malformedFormDoesNotAbortExport() throws Exception {

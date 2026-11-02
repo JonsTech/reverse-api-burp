@@ -57,4 +57,22 @@ class CaptureWorkerTest {
             assertThat(store.operations()).hasSize(1);
         } finally { handler.close(); }
     }
+    @Test void clearingOrClosingDoesNotLeaveQueuedHistoryImportHanging() throws Exception {
+        for (boolean close : List.of(false, true)) {
+            var handler = new TrafficCaptureHandler(new CaptureStore());
+            var started = new CountDownLatch(1); var release = new CountDownLatch(1);
+            try {
+                handler.capture(request("/busy", 10, () -> {
+                    started.countDown();
+                    try { release.await(5, TimeUnit.SECONDS); }
+                    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                }), null, true, false);
+                assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+                var imported = handler.importHistory(List.of());
+                if (close) handler.close(); else handler.clear();
+                assertThat(imported).isCompletedExceptionally();
+                assertThatThrownBy(() -> imported.get(1, TimeUnit.SECONDS)).isInstanceOf(CancellationException.class);
+            } finally { release.countDown(); handler.close(); }
+        }
+    }
 }

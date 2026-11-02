@@ -16,5 +16,13 @@ class PathNormalizerTest {
     @Test void preservesApiVersionAndNames() {
         assertThat(normalizer.normalize("/api/v1/users")).isEqualTo("/api/v1/users");
     }
+    @Test void groupsDateRangesWithoutChangingLiteralFlagsOrVersions() {
+        assertThat(normalizer.normalize("/api/v1/123/2026-01-01%2000:00:00/2026-11-03T10%3A40%3A59Z/false/null/true"))
+                .isEqualTo("/api/v1/{id}/{date}/{date2}/false/null/true");
+        assertThat(normalizer.normalize("/api/2026-11-02/2026-11-02T12:00:00+01:00"))
+                .isEqualTo("/api/{date}/{date2}");
+        assertThat(normalizer.normalize("/api/2026-11-report/%zz"))
+                .isEqualTo("/api/2026-11-report/%zz");
+    }
 }
 

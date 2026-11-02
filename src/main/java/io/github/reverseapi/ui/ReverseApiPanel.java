@@ -54,7 +54,8 @@ public final class ReverseApiPanel extends JPanel {
     private final JTextArea json = textArea();
     private final JTextArea postman = textArea();
     private final JTextArea details = textArea();
-    private final JLabel status = new JLabel("Capturing new Proxy traffic from all hosts. Import Proxy history to include existing traffic.");
+    private final JTextArea status = new JTextArea("Capturing new Proxy traffic from all hosts. Import Proxy history to include existing traffic.", 2, 0);
+    private final JTabbedPane previewTabs = new JTabbedPane();
     private final JButton captureButton = new JButton("Auto Capture ON");
     private final JCheckBox obfuscateExport = new JCheckBox("Obfuscate generated examples", true);
     private final JComboBox<ServerChoice> generationServer = new JComboBox<>();
@@ -97,7 +98,6 @@ public final class ReverseApiPanel extends JPanel {
         installTableMenu();
 
         add(toolbar(), BorderLayout.NORTH);
-        JTabbedPane previewTabs = new JTabbedPane();
         previewTabs.addTab("Request", requestPanel);
         previewTabs.addTab("Response", responsePanel);
         previewTabs.addTab("OpenAPI YAML", new JScrollPane(yaml));
@@ -107,6 +107,7 @@ public final class ReverseApiPanel extends JPanel {
         previewTabs.addTab("Detection settings", new JScrollPane(new DetectionSettingsPanel(store.settings(), message -> { status.setText(message); store.changed(); })));
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(table), previewTabs);
         split.setResizeWeight(0.55); split.setOneTouchExpandable(true);
+        status.setEditable(false); status.setLineWrap(true); status.setWrapStyleWord(true); status.setOpaque(false);
         add(split, BorderLayout.CENTER); add(status, BorderLayout.SOUTH);
 
         refreshTimer = new Timer(500, event -> { if (dirty.getAndSet(false)) refreshFromStore(); });
@@ -243,8 +244,8 @@ public final class ReverseApiPanel extends JPanel {
                 }
                 try {
                     generated = get();
-                    if (postmanExport) { postman.setText(generated.json()); postman.setCaretPosition(0); }
-                    else { yaml.setText(generated.yaml()); json.setText(generated.json()); yaml.setCaretPosition(0); json.setCaretPosition(0); }
+                    if (postmanExport) { postman.setText(generated.json()); postman.setCaretPosition(0); previewTabs.setSelectedIndex(4); }
+                    else { yaml.setText(generated.yaml()); json.setText(generated.json()); yaml.setCaretPosition(0); json.setCaretPosition(0); previewTabs.setSelectedIndex(2); }
                     status.setText("Generated " + snapshot.stream().filter(ApiOperation::included).count()
                             + " operations. Dropped observations: " + capture.dropped());
                     after.run();
@@ -254,6 +255,7 @@ public final class ReverseApiPanel extends JPanel {
                     // Generator errors deliberately omit captured values.
                     String message = "Generation failed: " + (cause instanceof IllegalArgumentException ? cause.getMessage() : "Unable to generate document");
                     if (postmanExport) postman.setText(message); else { yaml.setText(message); json.setText(message); }
+                    previewTabs.setSelectedIndex(postmanExport ? 4 : 2);
                     status.setText(message);
                 }
             }
@@ -276,7 +278,10 @@ public final class ReverseApiPanel extends JPanel {
                             + " eligible entries (" + result.skippedOutOfScope() + " out of scope, "
                             + result.skippedWithoutResponse() + " without a response). Generate OpenAPI when ready.");
                 } catch (Exception failure) {
-                    status.setText("Could not import Proxy history");
+                    Throwable cause = failure;
+                    while (cause.getCause() != null && cause.getCause() != cause) cause = cause.getCause();
+                    status.setText(cause instanceof java.util.concurrent.CancellationException
+                            ? "Proxy history import cancelled" : "Could not import Proxy history");
                 }
             }
         }.execute();

@@ -3,7 +3,7 @@
 [![Build](https://github.com/JonsTech/reverse-api-burp/actions/workflows/build.yml/badge.svg)](https://github.com/JonsTech/reverse-api-burp/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-Reverse API 1.0.0 is a passive Java/Montoya extension for Burp Suite 2026.8. It discovers likely API endpoints in Proxy traffic, supports endpoint review and path normalization, infers observed JSON schemas, and exports OpenAPI 3.1 YAML/JSON or Postman Collection 2.1 JSON.
+Reverse API 1.0.1 is a passive Java/Montoya extension for Burp Suite 2026.8+. It discovers likely API endpoints in Proxy traffic, supports endpoint review and path normalization, infers observed JSON schemas, and exports OpenAPI 3.1 YAML/JSON or Postman Collection 2.1 JSON.
 
 ![Reverse API discovering endpoints in a local OWASP Juice Shop instance](docs/images/reverse-api-juiceshop-demo.png)
 
@@ -19,7 +19,7 @@ Use JDK 17 (set `JAVA_HOME` to the JDK) and network access for the first build:
 .\gradlew.bat clean build
 ```
 
-On macOS/Linux use `./gradlew clean build`. Load **build/libs/ReverseAPI-1.0.0.jar** through **Extensions > Installed > Add > Java**, then open the **Reverse API** tab. The fat JAR includes Jackson, SnakeYAML and RE2/J. Montoya 2026.7 is a compile-only dependency supplied by Burp; its classes are not bundled.
+On macOS/Linux use `./gradlew clean build`. Load **build/libs/ReverseAPI-1.0.1.jar** through **Extensions > Installed > Add > Java**, then open the **Reverse API** tab. The fat JAR includes Jackson, SnakeYAML and RE2/J. Montoya 2026.7 is a compile-only dependency supplied by Burp; its classes are not bundled.
 
 On Windows, if the JDK reports `Unable to establish loopback connection` in a Gradle worker and an `UnixDomainSockets` stack trace, use a short existing writable temporary directory for that build, for example:
 
@@ -52,11 +52,11 @@ Additional JSON media types accept a comma-separated list and are used for detec
 
 ## Normalization and exports
 
-Endpoint identity includes scheme, host, port, method and automatically normalized path. Numeric segments, UUIDs, long hexadecimal and mixed alphanumeric tokens become `{id}`, `{id2}`, etc. Version segments such as `v1`, ordinary names, repeated slashes and trailing slashes remain literal.
+Endpoint identity includes scheme, host, port, method and automatically normalized path. Numeric segments, UUIDs, long hexadecimal and mixed alphanumeric tokens become `{id}`, `{id2}`, etc. Date and timestamp segments, including percent-encoded spaces and colons, become `{date}`, `{date2}`, etc. Version segments such as `v1`, ordinary names, repeated slashes and trailing slashes remain literal.
 
 OpenAPI includes operation-specific servers, path/query/custom-header parameters, JSON and URL-encoded request schemas, and responses by status. JSON inference handles nested objects, arrays, nullable types and optional fields across retained samples. Required properties mean present in the observed samples, not a verified server requirement. Bodies are not declared required merely because one was observed.
 
-Multipart, XML, binary and unknown bodies are represented by their media type with an unconstrained schema. No XSD, multipart field layout or binary encoding is invented. GraphQL is represented only as its HTTP endpoint and JSON envelope, not a GraphQL schema or separate query/mutation operations.
+Multipart request bodies use an object schema with no inferred fields or standard example. A raw MIME envelope is not a valid object of multipart field values and can break importers such as Bruno. In unchecked mode the original body remains in `x-captured-exchange`; multipart fields/files must be configured in the importing client. XML, binary and unknown bodies have unconstrained schemas. No XSD, multipart field layout or binary encoding is invented. GraphQL is represented only as its HTTP endpoint and JSON envelope, not a GraphQL schema or separate query/mutation operations.
 
 Bearer, Basic and recognized API-key headers create distinct security schemes and an `x-observed-security` extension on operations. This records evidence, not verified requirements or AND/OR relationships. Cookie presence alone does not prove authentication, so session-cookie schemes are not guessed.
 
@@ -66,7 +66,7 @@ Export rejects duplicate path/method operations across hosts, equivalent path te
 
 **Obfuscate generated examples** is checked by default and applies to OpenAPI YAML/JSON previews and exports, and Postman Collection JSON previews and exports. Request/response inspection inside Reverse API always shows captured values.
 
-- **Checked:** JSON/form string values and header/query examples are blanked, JSON numbers become zero and booleans false. JSON object/array structure and field names remain. Opaque XML, multipart and other unparsed bodies become empty examples rather than attempting unreliable selective redaction. Postman keeps media types for Content-Type, blanks other header values, and replaces normalized identifiers with empty path variables. Recognized credentials reflected into route or property names still block obfuscated export.
+- **Checked:** JSON/form string values and header/query examples are blanked, JSON numbers become zero and booleans false. JSON object/array structure and field names remain. Opaque XML and other unparsed bodies become empty examples rather than attempting unreliable selective redaction. OpenAPI omits multipart examples; Postman blanks their raw body. Postman keeps media types for Content-Type, blanks other header values, and replaces normalized identifiers with empty path variables. Recognized credentials reflected into route or property names still block obfuscated export.
 - **Unchecked:** captured values, including passwords, authorization tokens, API keys and cookies, are included. For example, `{ "user": "admin", "pass": "admin" }` stays intact; checked, both strings become empty. This mode deliberately produces sensitive working data for an authorized testing workflow.
 
 OpenAPI contains standard parameter and body examples, plus an `x-captured-exchange` extension in unchecked mode carrying the retained paired URL, headers and text bodies. Importers need not understand this extension, particularly for authentication. Use **Export Postman** for replay: it produces one request and paired response example per included operation, using the latest retained sample. Unchecked Postman export preserves the original captured URL (including repeated query values), headers and body text. Host, Content-Length, Connection, Transfer-Encoding and Proxy-Connection request headers are left for Postman to calculate. The collection explicitly disables inherited auth so captured Authorization/Cookie headers remain usable. Importing does not send requests automatically.
@@ -75,7 +75,7 @@ Postman requests use captured URLs even if the review path was edited; OpenAPI u
 
 ## Privacy and resource limits
 
-Captured values are visible inside Burp. Obfuscation is an export choice, not an access-control boundary. With obfuscation checked, the export metadata check covers common credential names, configured API-key headers and cookies; too many distinct credential values fail closed. With it unchecked, that check is intentionally disabled so captured credentials can be exported.
+Captured values are visible inside Burp. Obfuscation is an export choice, not an access-control boundary. With obfuscation checked, the export metadata check covers common credential names, configured API-key headers and cookie values; too many distinct credential values fail closed. Cookie attributes such as Domain/Path, boolean state fields and credential metadata such as tokenType are not treated as secrets. `Bearer null` and `Bearer undefined` are treated as absent-token placeholders. With obfuscation unchecked, that check is intentionally disabled so captured credentials can be exported.
 
 Raw bounded samples are retained in memory for inference and can contain credentials. Nothing is persisted to a Burp project or sent to an external service. Exported server addresses, route names, parameter names and JSON property names can still contain application-specific sensitive metadata that cannot reliably be recognized from traffic alone. Review paths and the generated document before sharing. This is not a general-purpose data-loss-prevention system.
 
@@ -83,11 +83,11 @@ Limits are 2,000 operations, 25 samples per operation, a 32 MiB estimated retain
 
 XML is never parsed, so external entities, DTDs, XInclude and external resources are never resolved. Malformed capture failures are contained in the worker. UI construction and updates run on Swing's event thread, notifications are coalesced, and capture workers/timers are stopped on unload.
 
-## Deliberate limits for 1.0.0
+## Deliberate limits for 1.0.1
 
 - Capture, configuration and review decisions are session-only. Project persistence is deferred until its lifecycle, compatibility and privacy behavior can be tested in Burp.
 - Automatic capture requires a response. Timed-out requests can be added manually; automatic correlation/expiry is deferred.
-- The first 25 samples drive inference; later observations increment the count but may introduce unseen statuses or fields. Capture loss is not proof that an endpoint or response does not exist.
+- Up to 25 samples drive inference. Once full, the first 24 are preserved and the last slot tracks the newest accepted exchange. Intermediate observations may introduce unseen statuses or fields. Capture loss is not proof that an endpoint or response does not exist.
 - Detection is heuristic. XML, SOAP, RPC and unusual APIs may need manual inclusion; a JSON document can be a false positive.
 - GraphQL expansion, XML/XSD inference and detailed multipart parsing are deferred. OpenAPI YAML/JSON and Postman Collection 2.1 JSON are supported.
 - No live Burp integration test is part of the automated suite; load and exercise the JAR in Burp before relying on it in an engagement.

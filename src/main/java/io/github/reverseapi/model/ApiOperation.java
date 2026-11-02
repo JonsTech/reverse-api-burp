@@ -34,6 +34,11 @@ public final class ApiOperation {
         confidence = Math.max(confidence, detection.confidence());
         if (reason == null || detection.confidence() >= confidence) reason = detection.reason();
         if (samples.size() < 25) samples.add(exchange);
+        else samples.set(samples.size() - 1, exchange);
+    }
+
+    synchronized long retentionCost(CapturedExchange exchange) {
+        return exchange.estimatedBytes() - (samples.size() < 25 ? 0 : latest().estimatedBytes());
     }
 
     public synchronized ApiOperation snapshot() {
