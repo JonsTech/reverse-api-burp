@@ -94,4 +94,19 @@ class ExportModesTest {
         assertThat(json.readTree(postman.generate(List.of(op),false)).at("/item/0/request/body/raw").asText()).isEqualTo(sample.requestBody());
         assertThat(json.readTree(postman.generate(List.of(op),true)).at("/item/0/request/body/raw").asText()).isEqualTo("pass=&count=&flag=&tag=&tag=");
     }
+
+    @Test void multipartMimeEnvelopesAreNotPublishedAsOpenApiFieldExamples() throws Exception {
+        String mime = "--boundary\r\nContent-Disposition: form-data; name=\"message\"\r\n\r\nprivate-value\r\n--boundary--\r\n";
+        var sample = TestExchange.exchange("PUT", "/api/upload", "multipart/form-data; boundary=boundary", mime, 204, "", "");
+        var op = new ApiOperation(sample, "/api/upload", new DetectionResult(true, false, 100, "test"), false);
+        for (boolean obfuscate : List.of(true, false)) {
+            var root = json.readTree(new OpenApiGenerator().generate(List.of(op), obfuscate).json());
+            var media = root.at("/paths/~1api~1upload/put/requestBody/content/multipart~1form-data");
+            assertThat(media.path("schema").path("type").asText()).isEqualTo("object");
+            assertThat(media.has("example")).isFalse();
+            if (obfuscate) assertThat(root.toString()).doesNotContain("private-value", "--boundary");
+            else assertThat(root.at("/paths/~1api~1upload/put/x-captured-exchange/requestBody").asText()).isEqualTo(mime);
+        }
+        assertThat(new PostmanGenerator(settings).generate(List.of(op), true)).doesNotContain("private-value", "--boundary");
+    }
 }

@@ -19,6 +19,27 @@ class ReleaseStoreTest {
         for (int i=0;i<100;i++) op.observe(sample,detection);
         assertThat(op.samples()).hasSize(25); assertThat(op.observations()).isEqualTo(101);
     }
+    @Test void retainsFirstObservationsAndNewestExchangeBeyondSampleLimit() {
+        var store = new EndpointDeduplicator(new PathNormalizer());
+        for (int i = 0; i < 30; i++) store.add(TestExchange.exchange("GET", "/api", "", "", 200,
+                "application/json", "{\"sequence\":" + i + "}"), detection, false);
+        var op = store.operations().get(0);
+        assertThat(op.samples()).hasSize(25);
+        assertThat(op.observations()).isEqualTo(30);
+        assertThat(op.samples().get(0).responseBody()).isEqualTo("{\"sequence\":0}");
+        assertThat(op.latest().responseBody()).isEqualTo("{\"sequence\":29}");
+        assertThat(op.snapshot().latest()).isEqualTo(op.latest());
+    }
+    @Test void replacingLatestSampleStillHonorsMemoryBudget() {
+        var store = new EndpointDeduplicator(new PathNormalizer());
+        var small = TestExchange.exchange("GET", "/api", "", "", 200, "", "");
+        for (int i = 0; i < 25; i++) store.add(small, detection, false);
+        store.add(TestExchange.exchange("GET", "/api", "", "", 200, "text/plain",
+                "x".repeat((int) EndpointDeduplicator.MAX_RETAINED_BYTES / 2)), detection, false);
+        assertThat(store.dropped()).isEqualTo(1);
+        assertThat(store.operations().get(0).latest()).isEqualTo(small);
+        assertThat(store.operations().get(0).observations()).isEqualTo(25);
+    }
     @Test void operationLimitAndClearAreBounded() {
         var store = new EndpointDeduplicator(new PathNormalizer());
         for (int i=0;i<2100;i++) store.add(TestExchange.exchange("GET", "/api/item-"+i, "", "", 200, "", ""),detection,false);

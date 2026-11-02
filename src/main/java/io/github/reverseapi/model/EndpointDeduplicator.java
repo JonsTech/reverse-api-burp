@@ -21,12 +21,12 @@ public final class EndpointDeduplicator {
         String normalized = normalizer.normalize(exchange.path());
         String key = exchange.scheme().toLowerCase(java.util.Locale.ROOT) + "://" + exchange.authority().toLowerCase(java.util.Locale.ROOT) + "\n" + exchange.method().toUpperCase(java.util.Locale.ROOT) + "\n" + normalized;
         ApiOperation existing = operations.get(key);
-        long cost = exchange.estimatedBytes();
+        long cost = existing == null ? exchange.estimatedBytes() : existing.retentionCost(exchange);
         if ((existing == null && operations.size() >= MAX_OPERATIONS)
-                || ((existing == null || existing.samples().size() < 25) && retainedBytes + cost > MAX_RETAINED_BYTES)) {
+                || retainedBytes + cost > MAX_RETAINED_BYTES) {
             dropped++; return null;
         }
-        if (existing == null || existing.samples().size() < 25) retainedBytes += cost;
+        retainedBytes += cost;
         if (existing != null) {
             existing.observe(exchange, detection);
             if (manual) existing.markApi();

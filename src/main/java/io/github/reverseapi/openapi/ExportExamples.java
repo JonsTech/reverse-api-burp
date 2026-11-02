@@ -76,6 +76,10 @@ public final class ExportExamples {
         if (body.isBlank()) return;
         if (type.isBlank()) type = "application/octet-stream";
         if (!(content.path(type) instanceof ObjectNode media)) return;
+        // A multipart Media Type example must be an object of part names/values.
+        // The captured MIME envelope is not such an object; keep it only in the
+        // explicit raw capture extension until multipart parsing is supported.
+        if (type.startsWith("multipart/")) return;
         JsonNode example;
         if (type.equals("application/json") || type.endsWith("+json") || settings.additionalJsonTypeSet().contains(type)) {
             try { example = JSON.readTree(body); }
@@ -98,6 +102,7 @@ public final class ExportExamples {
 
     public static String obfuscatedBody(String type, String body, DetectionSettings settings) throws com.fasterxml.jackson.core.JsonProcessingException {
         if (body.isBlank()) return body;
+        if (type.startsWith("multipart/")) return "";
         if (type.equals("application/x-www-form-urlencoded")) {
             List<String> fields = new ArrayList<>();
             for (String pair : body.split("&")) {

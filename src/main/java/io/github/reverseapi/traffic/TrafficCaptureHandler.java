@@ -19,10 +19,14 @@ public final class TrafficCaptureHandler implements HttpHandler {
             new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
     private final java.util.concurrent.atomic.AtomicLong dropped = new java.util.concurrent.atomic.AtomicLong();
     private final java.util.concurrent.atomic.AtomicLong epoch = new java.util.concurrent.atomic.AtomicLong();
+    private final java.util.Set<CompletableFuture<ProxyHistoryImporter.ImportResult>> pendingImports = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    public void close() { captureEnabled.set(false); epoch.incrementAndGet(); worker.shutdownNow(); }
+    public void close() { captureEnabled.set(false); epoch.incrementAndGet(); worker.shutdownNow(); cancelImports(); }
     public long dropped() { return dropped.get() + store.dropped(); }
-    public void clear() { epoch.incrementAndGet(); worker.getQueue().clear(); synchronized (store) { store.clear(); } dropped.set(0); }
+    public void clear() { epoch.incrementAndGet(); worker.getQueue().clear(); cancelImports(); synchronized (store) { store.clear(); } dropped.set(0); }
+    private void cancelImports() {
+        pendingImports.forEach(future -> future.completeExceptionally(new java.util.concurrent.CancellationException("Proxy history import cancelled")));
+    }
     public void capture(burp.api.montoya.http.message.requests.HttpRequest request,
                         burp.api.montoya.http.message.responses.HttpResponse response, boolean manual, boolean ignore) {
         try {
@@ -54,6 +58,8 @@ public final class TrafficCaptureHandler implements HttpHandler {
     public CompletableFuture<ProxyHistoryImporter.ImportResult> importHistory(
             java.util.List<burp.api.montoya.proxy.ProxyHttpRequestResponse> history) {
         CompletableFuture<ProxyHistoryImporter.ImportResult> result = new CompletableFuture<>();
+        pendingImports.add(result);
+        result.whenComplete((ignored, failure) -> pendingImports.remove(result));
         long generation = epoch.get();
         try {
             // Use one worker task so a large history does not overflow the live-capture queue.
@@ -62,7 +68,7 @@ public final class TrafficCaptureHandler implements HttpHandler {
                 java.util.Set<Integer> importedIds = new java.util.HashSet<>();
                 try {
                     for (var item : history) {
-                        if (generation != epoch.get()) break;
+                        if (result.isDone() || generation != epoch.get()) break;
                         if (!item.hasResponse()) { withoutResponse++; continue; }
                         var historyRequest = item.finalRequest();
                         if (onlyInScope.get() && !historyRequest.isInScope()) { outOfScope++; continue; }

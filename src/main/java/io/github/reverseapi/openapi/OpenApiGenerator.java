@@ -190,6 +190,10 @@ public final class OpenApiGenerator {
             } else if (type.equals("application/x-www-form-urlencoded")) {
                 ObjectNode schema = media.putObject("schema"); schema.put("type", "object"); ObjectNode props = schema.putObject("properties");
                 for (String payload : payloads) parseForm(payload).forEach((k, v) -> props.set(k, scalarSchema(v)));
+            } else if (type.startsWith("multipart/")) {
+                // Multipart is modelled as an object, never a raw MIME string.
+                // No individual parts are inferred from an opaque captured body.
+                media.putObject("schema").put("type", "object").putObject("properties");
             } else media.putObject("schema");
         });
     }
