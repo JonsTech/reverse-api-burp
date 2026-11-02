@@ -54,7 +54,7 @@ public final class ReverseApiPanel extends JPanel {
     private final JTextArea json = textArea();
     private final JTextArea postman = textArea();
     private final JTextArea details = textArea();
-    private final JLabel status = new JLabel("Capturing new in-scope Proxy traffic. Import Proxy history to include older traffic.");
+    private final JLabel status = new JLabel("Capturing new Proxy traffic from all hosts. Import Proxy history to include existing traffic.");
     private final JButton captureButton = new JButton("Auto Capture ON");
     private final JCheckBox obfuscateExport = new JCheckBox("Obfuscate generated examples", true);
     private final JComboBox<ServerChoice> generationServer = new JComboBox<>();
@@ -124,11 +124,14 @@ public final class ReverseApiPanel extends JPanel {
             captureButton.setText(capture.captureEnabled() ? "Auto Capture ON" : "Auto Capture OFF");
             status.setText(capture.captureEnabled() ? "Passive Proxy capture resumed" : "Capture paused");
         });
-        JCheckBox scope = new JCheckBox("Only include Burp in-scope traffic", true);
-        scope.addActionListener(event -> capture.onlyInScope(scope.isSelected()));
+        JCheckBox scope = new JCheckBox("Only include Burp in-scope traffic", capture.onlyInScope());
+        scope.addActionListener(event -> {
+            capture.onlyInScope(scope.isSelected());
+            status.setText("Scope filter updated. Use Import Proxy history to recover previously skipped traffic.");
+        });
         JButton importHistory = new JButton("Import Proxy history");
-        importHistory.setToolTipText("Scan Proxy history entries from before Reverse API was loaded, using the current scope filter.");
-        importHistory.addActionListener(event -> importEarlierHistory(importHistory));
+        importHistory.setToolTipText("Scan available Proxy history using the current scope filter, including traffic missed by Auto Capture.");
+        importHistory.addActionListener(event -> importHistory(importHistory));
         JButton clear = new JButton("Clear"); clear.addActionListener(event -> { historyImporter.reset(); capture.clear(); });
         JButton generate = new JButton("Generate OpenAPI"); generate.addActionListener(event -> regenerate());
         JButton generatePostman = new JButton("Generate Postman");
@@ -257,19 +260,19 @@ public final class ReverseApiPanel extends JPanel {
         }.execute();
     }
 
-    private void importEarlierHistory(JButton button) {
+    private void importHistory(JButton button) {
         if (closed || !button.isEnabled()) return;
         button.setEnabled(false); status.setText("Importing Proxy history...");
         new javax.swing.SwingWorker<ProxyHistoryImporter.ImportResult, Void>() {
             @Override protected ProxyHistoryImporter.ImportResult doInBackground() throws Exception {
-                return historyImporter.importEarlierHistory().get();
+                return historyImporter.importHistory().get();
             }
             @Override protected void done() {
                 button.setEnabled(true);
                 if (closed) return;
                 try {
                     var result = get();
-                    status.setText("Scanned " + result.scanned() + " earlier Proxy entries; processed " + result.eligible()
+                    status.setText("Scanned " + result.scanned() + " not-yet-imported Proxy entries; processed " + result.eligible()
                             + " eligible entries (" + result.skippedOutOfScope() + " out of scope, "
                             + result.skippedWithoutResponse() + " without a response). Generate OpenAPI when ready.");
                 } catch (Exception failure) {

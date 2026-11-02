@@ -3,34 +3,30 @@ package io.github.reverseapi.traffic;
 import burp.api.montoya.proxy.Proxy;
 import burp.api.montoya.proxy.ProxyHttpRequestResponse;
 
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Imports only the Proxy entries that pre-date this extension instance. */
+/** Imports available Proxy history, including traffic missed by live capture. */
 public final class ProxyHistoryImporter {
     private final Proxy proxy;
     private final TrafficCaptureHandler capture;
-    private final ZonedDateTime extensionLoadedAt;
     private final Set<Integer> importedIds = ConcurrentHashMap.newKeySet();
     private final java.util.concurrent.atomic.AtomicLong generation = new java.util.concurrent.atomic.AtomicLong();
 
-    public ProxyHistoryImporter(Proxy proxy, TrafficCaptureHandler capture, ZonedDateTime extensionLoadedAt) {
+    public ProxyHistoryImporter(Proxy proxy, TrafficCaptureHandler capture) {
         this.proxy = Objects.requireNonNull(proxy);
         this.capture = Objects.requireNonNull(capture);
-        this.extensionLoadedAt = Objects.requireNonNull(extensionLoadedAt);
     }
 
-    public CompletableFuture<ImportResult> importEarlierHistory() {
+    public CompletableFuture<ImportResult> importHistory() {
         long startedInGeneration = generation.get();
-        List<ProxyHttpRequestResponse> earlier = proxy.history().stream()
-                .filter(item -> item.time().isBefore(extensionLoadedAt))
+        List<ProxyHttpRequestResponse> pending = proxy.history().stream()
                 .filter(item -> !importedIds.contains(item.id()))
                 .toList();
-        return capture.importHistory(earlier).thenApply(result -> {
+        return capture.importHistory(pending).thenApply(result -> {
             if (generation.get() == startedInGeneration) importedIds.addAll(result.importedIds());
             return result;
         });

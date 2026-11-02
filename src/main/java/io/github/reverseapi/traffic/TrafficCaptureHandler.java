@@ -110,7 +110,7 @@ public final class TrafficCaptureHandler implements HttpHandler {
         }
     }
     private final AtomicBoolean captureEnabled = new AtomicBoolean(true);
-    private final AtomicBoolean onlyInScope = new AtomicBoolean(true);
+    private final AtomicBoolean onlyInScope = new AtomicBoolean(false);
 
     public TrafficCaptureHandler(CaptureStore store) { this.store = store; }
 
